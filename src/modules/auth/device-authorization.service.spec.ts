@@ -4,7 +4,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { DeviceAuthorizationService } from './device-authorization.service.js';
-import { DeviceAuthorization, DeviceAuthorizationStatus } from './entities/device-authorization.entity.js';
+import {
+  DeviceAuthorization,
+  DeviceAuthorizationStatus,
+} from './entities/device-authorization.entity.js';
 
 describe('DeviceAuthorizationService', () => {
   let service: DeviceAuthorizationService;
@@ -45,8 +48,12 @@ describe('DeviceAuthorizationService', () => {
       ],
     }).compile();
 
-    service = module.get<DeviceAuthorizationService>(DeviceAuthorizationService);
-    deviceRepository = module.get(getRepositoryToken(DeviceAuthorization)) as any;
+    service = module.get<DeviceAuthorizationService>(
+      DeviceAuthorizationService,
+    );
+    deviceRepository = module.get(
+      getRepositoryToken(DeviceAuthorization),
+    ) as any;
   });
 
   describe('generateDeviceCode', () => {
@@ -70,7 +77,9 @@ describe('DeviceAuthorizationService', () => {
       vi.mocked(deviceRepository.create).mockReturnValue(mockDevice);
       vi.mocked(deviceRepository.save).mockResolvedValue(mockDevice);
 
-      const result = await service.createAuthorization('nestjs-device-client', ['openid']);
+      const result = await service.createAuthorization('nestjs-device-client', [
+        'openid',
+      ]);
 
       expect(deviceRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -80,6 +89,7 @@ describe('DeviceAuthorizationService', () => {
           userId: null,
           status: DeviceAuthorizationStatus.PENDING,
           scopes: ['openid'],
+          expiresAt: expect.any(Date),
         }),
       );
       expect(deviceRepository.save).toHaveBeenCalled();
@@ -92,7 +102,9 @@ describe('DeviceAuthorizationService', () => {
 
       await service.createAuthorization('nestjs-device-client');
 
-      expect(deviceRepository.create).toHaveBeenCalledWith(expect.objectContaining({ scopes: null }));
+      expect(deviceRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ scopes: null }),
+      );
     });
   });
 
@@ -107,8 +119,14 @@ describe('DeviceAuthorizationService', () => {
     });
 
     it('should mark the device authorization as expired when TTL elapsed', async () => {
-      vi.mocked(deviceRepository.findOne).mockResolvedValue({ ...mockDevice, expiresAt: new Date(Date.now() - 1000) });
-      vi.mocked(deviceRepository.save).mockResolvedValue({ ...mockDevice, status: DeviceAuthorizationStatus.EXPIRED });
+      vi.mocked(deviceRepository.findOne).mockResolvedValue({
+        ...mockDevice,
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      vi.mocked(deviceRepository.save).mockResolvedValue({
+        ...mockDevice,
+        status: DeviceAuthorizationStatus.EXPIRED,
+      });
 
       const result = await service.findByDeviceCode('device-code-1');
 
@@ -163,7 +181,11 @@ describe('DeviceAuthorizationService', () => {
   describe('approve', () => {
     it('should approve a pending device authorization', async () => {
       vi.mocked(deviceRepository.findOne).mockResolvedValue(mockDevice);
-      vi.mocked(deviceRepository.save).mockResolvedValue({ ...mockDevice, status: DeviceAuthorizationStatus.APPROVED, userId: 'user-1' });
+      vi.mocked(deviceRepository.save).mockResolvedValue({
+        ...mockDevice,
+        status: DeviceAuthorizationStatus.APPROVED,
+        userId: 'user-1',
+      });
 
       const result = await service.approve('device-code-1', 'user-1');
 
@@ -175,7 +197,9 @@ describe('DeviceAuthorizationService', () => {
     it('should throw NotFoundException when the device authorization is unknown', async () => {
       vi.mocked(deviceRepository.findOne).mockResolvedValue(null);
 
-      await expect(service.approve('unknown-code', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(service.approve('unknown-code', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException when the device authorization is not pending', async () => {
@@ -184,7 +208,9 @@ describe('DeviceAuthorizationService', () => {
         status: DeviceAuthorizationStatus.APPROVED,
       });
 
-      await expect(service.approve('device-code-1', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(service.approve('device-code-1', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -202,7 +228,9 @@ describe('DeviceAuthorizationService', () => {
 
       const result = await service.approveByUserCode('ABCD-EFGH', 'user-1');
 
-      expect(deviceRepository.findOne).toHaveBeenCalledWith({ where: { userCode: 'ABCD-EFGH' } });
+      expect(deviceRepository.findOne).toHaveBeenCalledWith({
+        where: { userCode: 'ABCD-EFGH' },
+      });
       expect(result.status).toBe(DeviceAuthorizationStatus.APPROVED);
       expect(result.userId).toBe('user-1');
     });
@@ -210,7 +238,9 @@ describe('DeviceAuthorizationService', () => {
     it('should throw NotFoundException when the user code is unknown', async () => {
       vi.mocked(deviceRepository.findOne).mockResolvedValue(null);
 
-      await expect(service.approveByUserCode('ZZZZ-ZZZZ', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.approveByUserCode('ZZZZ-ZZZZ', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException when the device is not pending', async () => {
@@ -219,14 +249,22 @@ describe('DeviceAuthorizationService', () => {
         status: DeviceAuthorizationStatus.APPROVED,
       });
 
-      await expect(service.approveByUserCode('ABCD-EFGH', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.approveByUserCode('ABCD-EFGH', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('deny', () => {
     it('should deny a pending device authorization', async () => {
-      vi.mocked(deviceRepository.findOne).mockResolvedValue({ ...mockDevice, status: DeviceAuthorizationStatus.PENDING });
-      vi.mocked(deviceRepository.save).mockResolvedValue({ ...mockDevice, status: DeviceAuthorizationStatus.DENIED });
+      vi.mocked(deviceRepository.findOne).mockResolvedValue({
+        ...mockDevice,
+        status: DeviceAuthorizationStatus.PENDING,
+      });
+      vi.mocked(deviceRepository.save).mockResolvedValue({
+        ...mockDevice,
+        status: DeviceAuthorizationStatus.DENIED,
+      });
 
       const result = await service.deny('device-code-1');
 
@@ -237,7 +275,9 @@ describe('DeviceAuthorizationService', () => {
     it('should throw NotFoundException when the device authorization is unknown', async () => {
       vi.mocked(deviceRepository.findOne).mockResolvedValue(null);
 
-      await expect(service.deny('unknown-code')).rejects.toThrow(NotFoundException);
+      await expect(service.deny('unknown-code')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException when the device authorization is not pending', async () => {
@@ -246,13 +286,20 @@ describe('DeviceAuthorizationService', () => {
         status: DeviceAuthorizationStatus.APPROVED,
       });
 
-      await expect(service.deny('device-code-1')).rejects.toThrow(NotFoundException);
+      await expect(service.deny('device-code-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('isExpired', () => {
     it('should return true when the device authorization TTL elapsed', () => {
-      expect(service.isExpired({ ...mockDevice, expiresAt: new Date(Date.now() - 1000) })).toBe(true);
+      expect(
+        service.isExpired({
+          ...mockDevice,
+          expiresAt: new Date(Date.now() - 1000),
+        }),
+      ).toBe(true);
     });
 
     it('should return false when the device authorization is still valid', () => {
