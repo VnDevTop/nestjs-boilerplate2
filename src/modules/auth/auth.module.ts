@@ -6,12 +6,14 @@ import { APP_GUARD } from '@nestjs/core';
 
 import { UsersModule } from '../users/users.module.js';
 import { DeviceAuthorization } from './entities/device-authorization.entity.js';
+import { RefreshToken } from './entities/refresh-token.entity.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { OneTimeTokenService } from './one-time-token.service.js';
 import { DeviceAuthorizationService } from './device-authorization.service.js';
+import { RefreshTokenService } from './refresh-token.service.js';
 import { PasswordService } from './password.service.js';
 import { TotpService } from './totp.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
@@ -34,7 +36,7 @@ import { jwtConfig } from '../../config/jwt.config.js';
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([DeviceAuthorization]),
+    TypeOrmModule.forFeature([DeviceAuthorization, RefreshToken]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],
@@ -45,6 +47,7 @@ import { jwtConfig } from '../../config/jwt.config.js';
     TotpService,
     OneTimeTokenService,
     DeviceAuthorizationService,
+    RefreshTokenService,
     JwtStrategy,
     JwtAuthGuard,
     AuthGuard,
@@ -57,6 +60,6 @@ import { jwtConfig } from '../../config/jwt.config.js';
       useClass: GlobalAuthGuard,
     },
   ],
-  exports: [AuthService, PasswordService, TotpService, OneTimeTokenService, JwtStrategy, JwtAuthGuard, AuthGuard, PermissionsGuard, RolesGuard, OidcProviderRegistry, OidcService, JwtModule, PassportModule],
+  exports: [AuthService, PasswordService, TotpService, OneTimeTokenService, DeviceAuthorizationService, RefreshTokenService, JwtStrategy, JwtAuthGuard, AuthGuard, PermissionsGuard, RolesGuard, OidcProviderRegistry, OidcService, JwtModule, PassportModule],
 })
 export class AuthModule {}
