@@ -20,6 +20,8 @@ import {
   DeviceAuthorizationStatus,
   DeviceAuthorization,
 } from './entities/device-authorization.entity.js';
+import { RefreshToken } from './entities/refresh-token.entity.js';
+import { RefreshTokenService } from './refresh-token.service.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { User } from '../users/entities/user.entity.js';
 import type { RequestUser } from '../../common/interfaces/request-user.interface.js';
@@ -41,6 +43,7 @@ describe('AuthService', () => {
   let mailerService: MailerService;
   let oneTimeTokenService: OneTimeTokenService;
   let deviceAuthorizationService: DeviceAuthorizationService;
+  let refreshTokenService: RefreshTokenService;
 
   const mockDevice: DeviceAuthorization = {
     id: 'device-auth-1',
@@ -75,6 +78,17 @@ describe('AuthService', () => {
     deletedAt: null,
     passwordHash: 'hashed-password',
   };
+
+  const mockRefreshToken = {
+    id: 'refresh-token-1',
+    tokenHash: 'hashed-refresh-token',
+    userId: 'user-1',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    revoked: false,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    deletedAt: null,
+  } as RefreshToken;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -141,6 +155,16 @@ describe('AuthService', () => {
             cleanupExpired: vi.fn(),
           },
         },
+        {
+          provide: RefreshTokenService,
+          useValue: {
+            hashToken: vi.fn(),
+            create: vi.fn(),
+            findByTokenHash: vi.fn(),
+            revoke: vi.fn(),
+            revokeAllForUser: vi.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -154,6 +178,7 @@ describe('AuthService', () => {
     deviceAuthorizationService = module.get<DeviceAuthorizationService>(
       DeviceAuthorizationService,
     );
+    refreshTokenService = module.get<RefreshTokenService>(RefreshTokenService);
   });
 
   describe('AuthService without MailerService (optional dependency)', () => {
@@ -218,6 +243,16 @@ describe('AuthService', () => {
               deny: vi.fn(),
               isExpired: vi.fn(),
               cleanupExpired: vi.fn(),
+            },
+          },
+          {
+            provide: RefreshTokenService,
+            useValue: {
+              hashToken: vi.fn(),
+              create: vi.fn(),
+              findByTokenHash: vi.fn(),
+              revoke: vi.fn(),
+              revokeAllForUser: vi.fn(),
             },
           },
         ],
@@ -497,6 +532,7 @@ describe('AuthService', () => {
       vi.mocked(jwtService.signAsync)
         .mockResolvedValueOnce('access-token')
         .mockResolvedValueOnce('refresh-token');
+      vi.mocked(refreshTokenService.create).mockResolvedValue(mockRefreshToken);
 
       const result = await service.issueTokens({
         sub: 'user-1',
@@ -509,6 +545,7 @@ describe('AuthService', () => {
       expect(result.expiresIn).toBe(900);
       expect(result.tokenType).toBe('Bearer');
       expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
+      expect(refreshTokenService.create).toHaveBeenCalledWith('user-1', 'refresh-token');
     });
   });
 
@@ -521,14 +558,21 @@ describe('AuthService', () => {
         type: 'refresh',
       });
       vi.mocked(usersService.findById).mockResolvedValue(mockUser);
+      vi.mocked(refreshTokenService.hashToken).mockResolvedValue('hashed-refresh-token');
+      vi.mocked(refreshTokenService.findByTokenHash).mockResolvedValue(mockRefreshToken);
+      vi.mocked(refreshTokenService.revoke).mockResolvedValue(undefined);
       vi.mocked(jwtService.signAsync)
         .mockResolvedValueOnce('new-access-token')
         .mockResolvedValueOnce('new-refresh-token');
+      vi.mocked(refreshTokenService.create).mockResolvedValue(mockRefreshToken);
 
       const result = await service.refreshTokens('valid-refresh-token');
 
       expect(result.accessToken).toBe('new-access-token');
       expect(result.refreshToken).toBe('new-refresh-token');
+      expect(refreshTokenService.findByTokenHash).toHaveBeenCalledWith('hashed-refresh-token');
+      expect(refreshTokenService.revoke).toHaveBeenCalledWith('hashed-refresh-token');
+      expect(refreshTokenService.create).toHaveBeenCalledWith('user-1', 'new-refresh-token');
     });
 
     it('should throw UnauthorizedException for invalid refresh token', async () => {
@@ -564,6 +608,62 @@ describe('AuthService', () => {
       await expect(
         service.refreshTokens('valid-refresh-token'),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException when refresh token is not found', async () => {
+      vi.mocked(jwtService.verifyAsync).mockResolvedValue({
+        sub: 'user-1',
+        email: 'test@example.com',
+        roles: [Role.USER],
+        type: 'refresh',
+      });
+      vi.mocked(usersService.findById).mockResolvedValue(mockUser);
+      vi.mocked(refreshTokenService.hashToken).mockResolvedValue('hashed-refresh-token');
+      vi.mocked(refreshTokenService.findByTokenHash).mockResolvedValue(null);
+
+      await expect(
+        service.refreshTokens('valid-refresh-token'),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException and revoke all tokens on refresh token reuse', async () => {
+      vi.mocked(jwtService.verifyAsync).mockResolvedValue({
+        sub: 'user-1',
+        email: 'test@example.com',
+        roles: [Role.USER],
+        type: 'refresh',
+      });
+      vi.mocked(usersService.findById).mockResolvedValue(mockUser);
+      vi.mocked(refreshTokenService.hashToken).mockResolvedValue('hashed-refresh-token');
+      vi.mocked(refreshTokenService.findByTokenHash).mockResolvedValue({
+        ...mockRefreshToken,
+        revoked: true,
+      });
+
+      await expect(service.refreshTokens('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(refreshTokenService.revokeAllForUser).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should throw UnauthorizedException when refresh token is expired', async () => {
+      vi.mocked(jwtService.verifyAsync).mockResolvedValue({
+        sub: 'user-1',
+        email: 'test@example.com',
+        roles: [Role.USER],
+        type: 'refresh',
+      });
+      vi.mocked(usersService.findById).mockResolvedValue(mockUser);
+      vi.mocked(refreshTokenService.hashToken).mockResolvedValue('hashed-refresh-token');
+      vi.mocked(refreshTokenService.findByTokenHash).mockResolvedValue({
+        ...mockRefreshToken,
+        expiresAt: new Date(Date.now() - 1000),
+      });
+
+      await expect(service.refreshTokens('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(refreshTokenService.revokeAllForUser).not.toHaveBeenCalled();
     });
   });
 
