@@ -1,6 +1,6 @@
-# Phase 8.3 — Task 3: Device Code Flow — Final Status Summary
+# Phase 8.3 — Tasks 3 & 4: Device Code Flow & Refresh Token Rotation — Status Summary
 
-> **Date:** 2026-11-07
+> **Date:** 2026-11-07 – 2026-11-08
 > **Branch:** `feat/auth/advanced-security`
 > **Phase:** 8 — Authentication & authorization (JWT) → Phase 8.3 — Advanced security
 
@@ -40,9 +40,27 @@
 - Before fixing missing branches: `97.32%` statements → FAIL.
 - After adding missing tests (`approveByUserCode`, poll-device user-not-found, findByUserCode expired branch, deny-not-pending): `100%` statements / functions / lines — PASS.
 
+### ✅ Task 4 — Phase 8.3 — Refresh token rotation (Completed)
+
+> **Date:** 2026-11-08
+> **Branch:** `feat/auth/advanced-security`
+> **Task:** `feat(auth): add refresh token rotation`
+
+#### Implementation summary
+
+- **Task 4.1 — Storage:** `RefreshToken` entity (`refresh_tokens` table) with `tokenHash` (unique), `userId` (index), `expiresAt` and `revoked` flags + TypeORM migration `1791465600000-add-refresh-tokens.ts`.
+- **Task 4.2 — Service:** `RefreshTokenService` generating deterministic Argon2 hashes and persisting refresh tokens (hash + expiry + not revoked).
+- **Task 4.3 — Rotation:** `AuthService.issueTokens` persists the refresh token hash; `AuthService.refreshTokens` rotates refresh tokens on use and revokes all user tokens on refresh token reuse.
+
+#### Commits
+
+1. `feat(auth): add refresh token storage`
+2. `feat(auth): add refresh token service`
+3. `feat(auth): add refresh token rotation`
+4. `test(auth): add refresh token rotation tests`
+
 ### Remaining Phase 8.3 tasks (not yet started)
 
-- Task 4 — `feat(auth): add refresh token rotation`
 - Task 5 — `feat(security): add brute-force protection`
 - Task 6 — `feat(security): add audit logging`
 - Task 7 — `feat(auth): add jwt key versioning and rotation`
@@ -50,8 +68,8 @@
 
 ## Next step
 
-Continue with **Task 4 — Refresh token rotation** (`feat(auth): add refresh token rotation`), or review before proceeding.
+Continue with **Task 5 — Brute-force protection** (`feat(security): add brute-force protection`), or review before proceeding.
 
 ---
 
-*End of Task 3 summary.*
+*End of Task 3 / Task 4 summaries.*
