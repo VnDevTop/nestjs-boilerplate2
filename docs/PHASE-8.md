@@ -158,6 +158,22 @@ abstraction layer, registry for multi-provider support, and setup documentation.
 4. `test(auth): add device code flow tests`
    - Added unit tests for the device authorization service, the device endpoints and the device flow service branches.
 
+#### Task 4 — `feat(auth): add refresh token rotation`
+
+1. `feat(auth): add refresh token storage`
+   - Added `RefreshToken` entity (`refresh_tokens` table) with `tokenHash` (unique), `userId` (index), `expiresAt` and `revoked` flags, plus TypeORM migration `1791465600000-add-refresh-tokens.ts`.
+
+2. `feat(auth): add refresh token service`
+   - Added `RefreshTokenService` generating deterministic Argon2 hashes and persisting refresh tokens (hash + expiry + not revoked).
+
+3. `feat(auth): add refresh token rotation`
+   - `AuthService.issueTokens` now persists the refresh token hash.
+   - `AuthService.refreshTokens` rotates refresh tokens on use (revokes presented token, issues new pair) and revokes all user tokens on refresh token reuse (theft response).
+
+4. `test(auth): add refresh token rotation tests`
+   - Added unit tests for refresh token rotation, reuse detection, unknown token and expired token.
+   - Added E2E test: refresh rotation + reuse rejection + chained refresh.
+
 #### Validation
 
 ```bash

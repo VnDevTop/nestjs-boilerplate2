@@ -347,6 +347,33 @@ describe('Auth (e2e)', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('should rotate the refresh token on use and reject reuse of the rotated token', async () => {
+      const emailAddress = email();
+
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: emailAddress, password: 'password123' });
+      expect(registerRes.status).toBe(201);
+
+      const firstRefreshRes = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: registerRes.body.tokens.refreshToken });
+      expect(firstRefreshRes.status).toBe(200);
+      const rotatedRefreshToken = firstRefreshRes.body.refreshToken;
+
+      // The rotated token must be usable for the next refresh (rotation chaining).
+      const secondRefreshRes = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: rotatedRefreshToken });
+      expect(secondRefreshRes.status).toBe(200);
+
+      // Reusing the already-rotated (consumed) token is rejected.
+      const reuseRes = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: registerRes.body.tokens.refreshToken });
+      expect(reuseRes.status).toBe(401);
+    });
   });
 
   describe('Protected routes', () => {

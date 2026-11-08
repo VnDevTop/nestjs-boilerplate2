@@ -4,6 +4,7 @@ import { toDataURL } from 'qrcode';
 import { MailerService } from '@nestjs-modules/mailer';
 import { TotpService } from './totp.service.js';
 import { OneTimeTokenService } from './one-time-token.service.js';
+import { randomUUID } from 'node:crypto';
 
 import { UsersService } from '../users/users.service.js';
 import { PasswordService } from './password.service.js';
@@ -15,6 +16,7 @@ import { RequestUser } from '../../common/interfaces/request-user.interface.js';
 import { AuthMethod } from '../../common/enums/auth-method.enum.js';
 import { DeviceAuthorizationStatus } from './entities/device-authorization.entity.js';
 import { DeviceAuthorizationService } from './device-authorization.service.js';
+import { RefreshTokenService } from './refresh-token.service.js';
 import { DeviceAuthorizationResponse, DevicePollResponse } from './device-authorization.service.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { User } from '../users/entities/user.entity.js';
@@ -38,6 +40,7 @@ export class AuthService {
     private readonly totpService: TotpService,
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly deviceAuthorizationService: DeviceAuthorizationService,
+    private readonly refreshTokenService: RefreshTokenService,
     @Optional() private readonly mailerService: MailerService,
   ) {}
 
@@ -56,9 +59,11 @@ export class AuthService {
       expiresIn: '15m',
     });
     const refreshToken = await this.jwtService.signAsync(
-      { ...payload, type: 'refresh' },
+      { ...payload, type: 'refresh', jti: randomUUID() },
       { secret: jwtConfig().refreshSecret, expiresIn: jwtConfig().refreshExpiresIn as any },
     );
+    // Persist refresh token hash for rotation and revocation.
+    await this.refreshTokenService.create(payload.sub, refreshToken);
     return {
       accessToken,
       refreshToken,
@@ -90,6 +95,12 @@ export class AuthService {
   /**
    * Refreshes an access token using a valid refresh token.
    *
+   * Implements refresh token rotation: the presented refresh token is
+   * verified, checked against the persisted store and then consumed
+   * (revoked) before a new token pair is issued. When a reused (already
+   * revoked) refresh token is detected, all refresh tokens of the user are
+   * revoked (theft response) and the request is rejected.
+   *
    * @param refreshToken - The refresh token string.
    * @returns New token pair.
    */
@@ -108,12 +119,36 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
+      const tokenHash = await this.refreshTokenService.hashToken(refreshToken);
+      const stored = await this.refreshTokenService.findByTokenHash(tokenHash);
+      if (!stored) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      if (stored.revoked) {
+        // Reuse detected: revoke all user tokens and reject.
+        await this.refreshTokenService.revokeAllForUser(user.id);
+        throw new UnauthorizedException('Refresh token reuse detected');
+      }
+
+      if (stored.expiresAt && stored.expiresAt.getTime() < Date.now()) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      // Rotate: consume the presented refresh token and issue a new pair.
+      await this.refreshTokenService.revoke(stored.tokenHash);
+
       return this.issueTokens({
         sub: user.id,
         email: user.email,
         roles: user.roles as any,
+        authMethod: payload.authMethod,
+        mfaVerified: payload.mfaVerified,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }

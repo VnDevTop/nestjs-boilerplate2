@@ -55,12 +55,12 @@
 ## 3. Token Lifecycle
 
 1. Access token: signed JWT, 15m TTL; refresh token: signed JWT, 7d TTL, `type: 'refresh'`
-2. Refresh: `POST /auth/refresh` → verify refresh → issue new pair (rotation planned — Task 4)
+2. Refresh: `POST /auth/refresh` → verify refresh → rotate (revoke presented token, issue new pair) → on reuse revoke all user tokens (theft response)
 3. Device tokens: issued via poll with `authMethod: DEVICE`, `mfaVerified: true
 
 ## 4. Security Gates (to be implemented in Phase 8.3)
 
-1. **Brute-force protection** (Task 5): throttle on login / magic-link / passcode / device endpoints.
+1. **Brute-force protection** (Task 5): throttle on login / magic-link / passcode / device endpoints. *(Task 4 — refresh token rotation & reuse revocation — implemented)*
 2. **Audit logging** (Task 6).
 3. **JWT key versioning & rotation** (Task 7).
 4. **Account security features** (Task 8).

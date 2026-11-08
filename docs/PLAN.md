@@ -1148,7 +1148,7 @@ First release: `v12.0.0`.
   - [ ] Phase 8.0 — Auth module skeleton
   - [ ] Phase 8.1 — Basic JWT auth
   - [ ] Phase 8.2 — OIDC providers
-  - [ ] Phase 8.3 — Advanced security
+  - [x] Phase 8.3 — Advanced security
   - [ ] Phase 8.4 — Machine-to-machine
   - [ ] Phase 8.5 — Cache-backed auth & notifications
   - [ ] Phase 8.6 — Tests
