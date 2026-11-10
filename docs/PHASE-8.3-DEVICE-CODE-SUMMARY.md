@@ -61,15 +61,14 @@
 
 ### Remaining Phase 8.3 tasks (not yet started)
 
-- Task 5 — `feat(security): add brute-force protection`
 - Task 6 — `feat(security): add audit logging`
 - Task 7 — `feat(auth): add jwt key versioning and rotation`
 - Task 8 — `feat(security): add account security features`
 
 ## Next step
 
-Continue with **Task 5 — Brute-force protection** (`feat(security): add brute-force protection`), or review before proceeding.
+Continue with **Task 6 — Audit logging** (`feat(security): add audit logging`), or review before proceeding.
 
 ---
 
-*End of Task 3 / Task 4 summaries.*
+*End of Task 3 / Task 4 / Task 5 summaries.*

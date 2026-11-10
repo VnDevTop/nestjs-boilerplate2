@@ -60,7 +60,7 @@
 
 ## 4. Security Gates (to be implemented in Phase 8.3)
 
-1. **Brute-force protection** (Task 5): throttle on login / magic-link / passcode / device endpoints. *(Task 4 — refresh token rotation & reuse revocation — implemented)*
+1. **Brute-force protection** (Task 5): account lockout + throttling on auth endpoints (login / magic-link / passcode / device / register / MFA). *(Task 4 — refresh token rotation & reuse revocation — implemented; Task 5 — brute-force protection — implemented)*
 2. **Audit logging** (Task 6).
 3. **JWT key versioning & rotation** (Task 7).
 4. **Account security features** (Task 8).
