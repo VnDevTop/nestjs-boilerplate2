@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import {
 } from './entities/device-authorization.entity.js';
 import { RefreshToken } from './entities/refresh-token.entity.js';
 import { RefreshTokenService } from './refresh-token.service.js';
+import { BruteForceProtectionService } from './brute-force-protection.service.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { User } from '../users/entities/user.entity.js';
 import type { RequestUser } from '../../common/interfaces/request-user.interface.js';
@@ -44,6 +46,7 @@ describe('AuthService', () => {
   let oneTimeTokenService: OneTimeTokenService;
   let deviceAuthorizationService: DeviceAuthorizationService;
   let refreshTokenService: RefreshTokenService;
+  let bruteForceProtectionService: BruteForceProtectionService;
 
   const mockDevice: DeviceAuthorization = {
     id: 'device-auth-1',
@@ -165,6 +168,15 @@ describe('AuthService', () => {
             revokeAllForUser: vi.fn(),
           },
         },
+        {
+          provide: BruteForceProtectionService,
+          useValue: {
+            isLocked: vi.fn(),
+            registerFailedAttempt: vi.fn(),
+            resetFailedAttempts: vi.fn(),
+            cleanupExpired: vi.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -179,6 +191,21 @@ describe('AuthService', () => {
       DeviceAuthorizationService,
     );
     refreshTokenService = module.get<RefreshTokenService>(RefreshTokenService);
+    bruteForceProtectionService = module.get<BruteForceProtectionService>(
+      BruteForceProtectionService,
+    );
+
+    vi.mocked(bruteForceProtectionService.isLocked).mockResolvedValue(false);
+    vi.mocked(bruteForceProtectionService.registerFailedAttempt).mockResolvedValue({
+      failedCount: 0,
+      lockedUntil: null,
+    });
+    vi.mocked(bruteForceProtectionService.resetFailedAttempts).mockResolvedValue(
+      undefined,
+    );
+    vi.mocked(bruteForceProtectionService.cleanupExpired).mockResolvedValue(
+      undefined,
+    );
   });
 
   describe('AuthService without MailerService (optional dependency)', () => {
@@ -253,6 +280,15 @@ describe('AuthService', () => {
               findByTokenHash: vi.fn(),
               revoke: vi.fn(),
               revokeAllForUser: vi.fn(),
+            },
+          },
+          {
+            provide: BruteForceProtectionService,
+            useValue: {
+              isLocked: vi.fn(),
+              registerFailedAttempt: vi.fn(),
+              resetFailedAttempts: vi.fn(),
+              cleanupExpired: vi.fn(),
             },
           },
         ],
@@ -400,6 +436,9 @@ describe('AuthService', () => {
         expect.objectContaining({ type: 'refresh' }),
         expect.objectContaining({ secret: jwtConfig().refreshSecret }),
       );
+      expect(bruteForceProtectionService.resetFailedAttempts).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
 
     it('should throw UnauthorizedException for invalid email', async () => {
@@ -408,6 +447,9 @@ describe('AuthService', () => {
       await expect(
         service.login('nonexistent@example.com', 'password123'),
       ).rejects.toThrow(UnauthorizedException);
+      expect(bruteForceProtectionService.registerFailedAttempt).toHaveBeenCalledWith(
+        'nonexistent@example.com',
+      );
     });
 
     it('should throw UnauthorizedException for invalid password', async () => {
@@ -419,6 +461,10 @@ describe('AuthService', () => {
       await expect(
         service.login('test@example.com', 'wrong-password'),
       ).rejects.toThrow(UnauthorizedException);
+
+      expect(bruteForceProtectionService.registerFailedAttempt).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
 
     it('should throw UnauthorizedException with generic message for invalid credentials', async () => {
@@ -430,6 +476,10 @@ describe('AuthService', () => {
       await expect(
         service.login('test@example.com', 'wrong-password'),
       ).rejects.toThrow('Invalid email or password');
+
+      expect(bruteForceProtectionService.registerFailedAttempt).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
 
     it('should throw UnauthorizedException when user has no password hash', async () => {
@@ -441,6 +491,10 @@ describe('AuthService', () => {
       await expect(
         service.login('test@example.com', 'password123'),
       ).rejects.toThrow(UnauthorizedException);
+
+      expect(bruteForceProtectionService.registerFailedAttempt).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
 
     it('should throw UnauthorizedException when user not found after validation', async () => {
@@ -453,6 +507,10 @@ describe('AuthService', () => {
       await expect(
         service.login('test@example.com', 'password123'),
       ).rejects.toThrow(UnauthorizedException);
+
+      expect(bruteForceProtectionService.resetFailedAttempts).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
 
     it('should return mfaRequired and mfaToken when user has totp enabled', async () => {
@@ -480,6 +538,29 @@ describe('AuthService', () => {
           authMethod: AuthMethod.PASSWORD,
         }),
         { expiresIn: '10m' },
+      );
+    });
+
+    it('should throw HttpException when the account is locked due to failed attempts', async () => {
+      vi.mocked(bruteForceProtectionService.isLocked).mockResolvedValue(true);
+
+      await expect(
+        service.login('test@example.com', 'password123'),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should register a failed login attempt when credentials are invalid', async () => {
+      vi.mocked(usersService.findByEmailWithPassword).mockResolvedValue(
+        mockUser,
+      );
+      vi.mocked(passwordService.verify).mockResolvedValue(false);
+
+      await expect(
+        service.login('test@example.com', 'wrong-password'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(bruteForceProtectionService.registerFailedAttempt).toHaveBeenCalledWith(
+        'test@example.com',
       );
     });
   });

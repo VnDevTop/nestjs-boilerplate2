@@ -800,5 +800,29 @@ describe('Auth (e2e)', () => {
       }
       expect(results[results.length - 1]).toBe(429);
     });
+
+    it('should reject login with valid credentials while the account is locked', async () => {
+      const emailAddress = email();
+
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: emailAddress, password: 'password123' });
+      expect(registerRes.status).toBe(201);
+
+      // Exhaust the failed attempt threshold via wrong passwords.
+      for (let i = 0; i < 5; i++) {
+        const res = await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: emailAddress, password: 'wrong-password' });
+        expect(res.status).toBe(401);
+      }
+
+      // The account is locked: even valid credentials must be rejected.
+      const lockedRes = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: emailAddress, password: 'password123' });
+
+      expect(lockedRes.status).toBe(429);
+    });
   });
 });
