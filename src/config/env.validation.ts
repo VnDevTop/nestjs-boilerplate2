@@ -78,6 +78,10 @@ const envSchema = z.object({
   THROTTLE_TTL: z.coerce.number().int().positive().optional(),
   THROTTLE_LIMIT: z.coerce.number().int().positive().optional(),
   THROTTLE_BLOCK_DURATION: z.coerce.number().int().optional(),
+  BRUTE_FORCE_MAX_ATTEMPTS: z.coerce.number().int().positive().optional(),
+  BRUTE_FORCE_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
+  BRUTE_FORCE_LOCKOUT_SECONDS: z.coerce.number().int().positive().optional(),
+  BRUTE_FORCE_MAX_LOCKOUT_SECONDS: z.coerce.number().int().positive().optional(),
   // OIDC providers (optional; each provider is enabled when client id and secret are set)
   OIDC_GOOGLE_CLIENT_ID: z.string().optional(),
   OIDC_GOOGLE_CLIENT_SECRET: z.string().optional(),

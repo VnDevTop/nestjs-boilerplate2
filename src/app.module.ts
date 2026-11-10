@@ -28,6 +28,7 @@ import {
   retentionConfig,
   swaggerConfig,
   throttleConfig,
+  bruteForceConfig,
   validateEnv
 } from './config/index.js';
 import { AdminModule } from './modules/admin/admin.module.js';
@@ -41,7 +42,7 @@ export const {ObserveModule, ObserveInstrument} = createObserveModule();
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, observeConfig, cacheConfig, corsConfig, databaseConfig, swaggerConfig, i18nConfig, jwtConfig, oidcConfig, queueConfig, retentionConfig, mailConfig, throttleConfig],
+      load: [appConfig, observeConfig, cacheConfig, corsConfig, databaseConfig, swaggerConfig, i18nConfig, jwtConfig, oidcConfig, queueConfig, retentionConfig, mailConfig, throttleConfig, bruteForceConfig],
       validate: validateEnv,
     }),
     // Distributed tracing, auto-correlated logs, request/job metrics, error
