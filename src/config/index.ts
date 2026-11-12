@@ -15,4 +15,5 @@ export { oidcConfig } from './oidc.config.js';
 export { securityHeaderConfig } from './security-header.config.js';
 export { swaggerConfig } from './swagger.config.js';
 export { throttleConfig } from './throttle.config.js';
+export { bruteForceConfig } from './brute-force.config.js';
 export { validateEnv } from './env.validation.js';

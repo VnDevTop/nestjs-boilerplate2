@@ -22,9 +22,11 @@ export class AuthController {
    */
   @Public()
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 3600000 } })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   async register(@Body() body: { email: string; password: string; name?: string }) {
     return this.authService.register(body.email, body.password, body.name);
   }
@@ -126,6 +128,7 @@ export class AuthController {
    */
   @Post('mfa/verify')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Verify TOTP code and enable two-factor authentication' })
   @ApiResponse({ status: 200, description: 'Two-factor authentication enabled' })
   async verifyMfa(@Body() body: { code: string }, @CurrentUser() user: RequestUser) {
@@ -150,6 +153,7 @@ export class AuthController {
    */
   @Post('mfa/disable')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Disable two-factor authentication' })
   @ApiResponse({ status: 200, description: 'Two-factor authentication disabled' })
   async disableMfa(@Body() body: { code: string }, @CurrentUser() user: RequestUser) {

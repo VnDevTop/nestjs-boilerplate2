@@ -174,6 +174,22 @@ abstraction layer, registry for multi-provider support, and setup documentation.
    - Added unit tests for refresh token rotation, reuse detection, unknown token and expired token.
    - Added E2E test: refresh rotation + reuse rejection + chained refresh.
 
+#### Task 5 — `feat(security): add brute-force protection`
+
+1. `feat(security): add failed login attempt storage`
+   - Added `LoginAttempt` entity (`login_attempts` table) with `identifier`, `failedCount`, `lockedUntil`, `lastFailedAt`, `lockoutCount` plus TypeORM migration `1791744000000-add-login-attempts.ts`.
+
+2. `feat(security): add brute force protection service`
+   - Added `BruteForceProtectionService` enforcing the account lockout policy: after `BRUTE_FORCE_MAX_ATTEMPTS` failed attempts within the sliding window (`BRUTE_FORCE_WINDOW_SECONDS`), the identifier is locked for `BRUTE_FORCE_LOCKOUT_SECONDS`; lock duration doubles per progressive lockout and is capped at `BRUTE_FORCE_MAX_LOCKOUT_SECONDS`.
+
+3. `feat(security): add account lockout to auth flows`
+   - `AuthService.login` now rejects locked accounts with `429 Too Many Requests` and records failed attempts (reset on successful login).
+   - Added `@Throttle` to `POST /auth/register`, `POST /auth/mfa/verify`, `POST /auth/mfa/verify-login` and `POST /auth/mfa/disable` (in addition to the existing login / magic-link / passcode / device limits).
+
+4. `test(security): add brute force protection tests`
+   - Added unit tests for `BruteForceProtectionService` and lockout behaviour in `AuthService.login`.
+   - Added e2e test: login rejected with valid credentials while the account is locked.
+
 #### Validation
 
 ```bash

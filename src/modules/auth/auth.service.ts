@@ -1,4 +1,13 @@
-import { ConflictException, Injectable, Logger, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { toDataURL } from 'qrcode';
 import { MailerService } from '@nestjs-modules/mailer';
@@ -17,6 +26,7 @@ import { AuthMethod } from '../../common/enums/auth-method.enum.js';
 import { DeviceAuthorizationStatus } from './entities/device-authorization.entity.js';
 import { DeviceAuthorizationService } from './device-authorization.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
+import { BruteForceProtectionService } from './brute-force-protection.service.js';
 import { DeviceAuthorizationResponse, DevicePollResponse } from './device-authorization.service.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { User } from '../users/entities/user.entity.js';
@@ -41,6 +51,7 @@ export class AuthService {
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly deviceAuthorizationService: DeviceAuthorizationService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly bruteForceProtectionService: BruteForceProtectionService,
     @Optional() private readonly mailerService: MailerService,
   ) {}
 
@@ -216,6 +227,10 @@ export class AuthService {
   /**
    * Authenticates a user with email and password.
    *
+   * Applies brute-force protection: rejects locked accounts with
+   * `429 Too Many Requests` and records failed attempts (locking the account
+   * after the configured threshold).
+   *
    * @param email - User email.
    * @param password - Plain-text password.
    * @returns Authentication result with tokens.
@@ -223,10 +238,23 @@ export class AuthService {
   async login(email: string, password: string): Promise<AuthResult> {
     this.logger.log(`Login attempt: ${email}`);
 
+    const isLocked = await this.bruteForceProtectionService.isLocked(email);
+    if (isLocked) {
+      throw new HttpException(
+        'Too many failed login attempts. Account temporarily locked. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const requestUser = await this.validateUser(email, password);
     if (!requestUser) {
+      // Failed attempt recorded for brute-force protection / account lockout.
+      await this.bruteForceProtectionService.registerFailedAttempt(email);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Successful login resets the failed attempt counter.
+    await this.bruteForceProtectionService.resetFailedAttempts(email);
 
     const user = await this.usersService.findByEmail(email);
     if (!user) {

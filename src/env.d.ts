@@ -181,6 +181,30 @@ declare global {
        */
       THROTTLE_BLOCK_DURATION?: number;
       /**
+       * Failed login attempts allowed within the brute-force window before lockout.
+       * Optional: defaults to 5 if not set.
+       * Must be a positive integer.
+       */
+      BRUTE_FORCE_MAX_ATTEMPTS?: number;
+      /**
+       * Sliding window in seconds during which failed attempts are counted.
+       * Optional: defaults to 900 (15 min) if not set.
+       * Must be a positive integer.
+       */
+      BRUTE_FORCE_WINDOW_SECONDS?: number;
+      /**
+       * Base account lockout duration in seconds (doubles per progressive lockout).
+       * Optional: defaults to 900 (15 min) if not set.
+       * Must be a positive integer.
+       */
+      BRUTE_FORCE_LOCKOUT_SECONDS?: number;
+      /**
+       * Maximum account lockout duration in seconds (progressive lockout cap).
+       * Optional: defaults to 86400 (24h) if not set.
+       * Must be a positive integer.
+       */
+      BRUTE_FORCE_MAX_LOCKOUT_SECONDS?: number;
+      /**
        * Google OAuth2 client ID for OIDC sign-in.
        * Optional: when both client ID and secret are set, the Google provider is enabled.
        */
